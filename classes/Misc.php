@@ -12,7 +12,7 @@
 		var $form;
 
 		/* Constructor */
-		function __construct() { 
+		function __construct() {
 		}
 
 		/**
@@ -261,8 +261,12 @@
 			if (isset($params['clip']) && $params['clip'] === true) {
 				$maxlen = isset($params['cliplen']) && is_integer($params['cliplen']) ? $params['cliplen'] : $conf['max_chars'];
 				$ellipsis = isset($params['ellipsis']) ? $params['ellipsis'] : $lang['strellipsis'];
-				if (mb_strlen($str, 'UTF-8') > $maxlen) {
+				if (mb_strlen($str, 'UTF-8') > $maxlen + mb_strlen($ellipsis)) {
+					$full_str = $ellipsis . mb_substr($str, $maxlen-1, $maxlen*8, 'UTF-8');
 					$str = mb_substr($str, 0, $maxlen-1, 'UTF-8') . $ellipsis;
+				} elseif (strlen($str) > 19 and substr($type, 0, 9) == 'timestamp') {
+					$full_str = substr($str, 19, $maxlen*8);
+					$str = substr($str, 0, 19);
 				}
 			}
 
@@ -308,6 +312,10 @@
 					$class = 'pre';
 					$out = $data->escapeBytea($str);
 					break;
+				case 'macaddr':
+					$tag = 'tt';
+					$out = $str;
+					break;
 				case 'errormsg':
 					$tag = 'pre';
 					$class = 'error';
@@ -331,7 +339,7 @@
 					$out = $params['function']($str, $params);
 					break;
 				case 'prettysize':
-					if ($str == -1) 
+					if ($str == -1)
 						$out = $lang['strnoaccess'];
 					else
 					{
@@ -373,8 +381,10 @@
 						$tag = 'pre';
 						$class = 'data';
 						$out = htmlspecialchars($str);
+						if (isset($full_str)) $out = '<abbr title="' . htmlspecialchars($full_str) . "\">$out</abbr>";
 					} else {
 						$out = nl2br(htmlspecialchars($str));
+						if (isset($full_str)) $out = '<abbr title="' . nl2br(htmlspecialchars($full_str)) . "\">$out</abbr>";
 					}
 			}
 
@@ -408,30 +418,6 @@
 		}
 
 		/**
-		 * A function to recursively strip slashes.  Used to
-		 * enforce magic_quotes_gpc being off.
-		 * @param &var The variable to strip
-		 */
-		function stripVar(&$var) {
-			if (is_array($var)) {
-				foreach($var as $k => $v) {
-					$this->stripVar($var[$k]);
-
-					/* magic_quotes_gpc escape keys as well ...*/
-					if (is_string($k)) {
-						$ek = stripslashes($k);
-						if ($ek !== $k) {
-							$var[$ek] = $var[$k];
-							unset($var[$k]);
-						}
-					}
-				}
-			}
-			else
-				$var = stripslashes($var);
-		}
-
-		/**
 		 * Print out the page heading and help link
 		 * @param $title Title, already escaped
 		 * @param $help (optional) The identifier for the help link
@@ -456,7 +442,7 @@
 		 * Creates a database accessor
 		 */
 		function getDatabaseAccessor($database, $server_id = null) {
-			global $lang, $conf, $misc, $_connection;
+			global $lang, $conf, $misc, $_connection, $postgresqlMinVer;
 
 			$server_info = $this->getServerInfo($server_id);
 
@@ -494,7 +480,7 @@
 				exit;
 			}
 			$this->setServerInfo('platform', $platform, $server_id);
-			$this->setServerInfo('pgVersion', $_connection->conn->pgVersion, $server_id);
+			$this->setServerInfo('pgVersion', $_connection->conn->ServerInfo()['version'], $server_id);
 
 			// Create a database wrapper class for easy manipulation of the
 			// connection.
@@ -537,21 +523,54 @@
 				if (strcasecmp($lang['applangdir'], 'ltr') != 0) echo " dir=\"", htmlspecialchars($lang['applangdir']), "\"";
 				echo ">\n";
 
-				echo "<head>\n";
-				echo "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n";
-				// Theme
-				echo "<link rel=\"stylesheet\" href=\"themes/{$conf['theme']}/global.css\" type=\"text/css\" id=\"csstheme\" />\n";
-				echo "<link rel=\"shortcut icon\" href=\"images/themes/{$conf['theme']}/Favicon.ico\" type=\"image/vnd.microsoft.icon\" />\n";
-				echo "<link rel=\"icon\" type=\"image/png\" href=\"images/themes/{$conf['theme']}/Introduction.png\" />\n";
-				echo "<script type=\"text/javascript\" src=\"libraries/js/jquery.js\"></script>";
-				echo "<script type=\"text/javascript\">// <!-- \n";
-				echo "$(function() { \n";
-				echo "  if (window.parent.frames.length > 1)\n";
-				echo "    $('#csstheme', window.parent.frames[0].document).attr('href','themes/{$conf['theme']}/global.css');\n";
-				echo "}); // --></script>\n";
-				echo "<title>", htmlspecialchars($appName);
-				if ($title != '') echo htmlspecialchars(" - {$title}");
-				echo "</title>\n";
+				$_formatTitle = '';
+				if (!empty($title)) {
+					$_formatTitle = htmlspecialchars($appName . ' - ' . $title);
+				} else {
+					$_formatTitle = htmlspecialchars($appName);
+				}
+
+				echo <<<EOL
+				<head>
+					<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+					<link rel="stylesheet" href="themes/{$conf['theme']}/global.css" type="text/css" id="csstheme" />
+					<link rel="shortcut icon" href="images/themes/{$conf['theme']}/Favicon.ico" type="image/vnd.microsoft.icon" />
+					<link rel="icon" type="image/png" href="images/themes/{$conf['theme']}/Introduction.png" />
+					<script type="text/javascript" src="libraries/js/jquery.js"></script>
+
+					<script type="text/javascript">
+						$(function() {
+							if (window.parent.frames.length > 1) {
+								$('#csstheme', window.parent.frames[0].document).attr('href','themes/{$conf['theme']}/global.css');
+							}
+						});
+
+				EOL;
+				if (!$frameset) echo <<<EOL
+
+						if ("{$_SERVER['REQUEST_METHOD']}" === "GET" && (window.self === window.top)) {
+							$.post(new URL('./', location.href).href, { _originalPath: location.href }, function (data) {
+								// GET request from outside frame. Reload encapsulated in our frameset.
+								document.write(data);
+
+								history.replaceState({}, '', new URL('./', location.href).href);
+							});
+						}
+
+						$(function() {
+							top.document.title = document.title;
+						});
+
+
+				EOL;
+
+				echo <<<EOL
+					</script>
+
+					<title>{$_formatTitle}</title>
+
+				EOL;
+
 
 				if ($script) echo "{$script}\n";
 
@@ -579,7 +598,7 @@
 			if ($doBody) {
 				if (isset($_reload_browser)) $this->printReload(false);
 				elseif (isset($_reload_drop_database)) $this->printReload(true);
-				if (!isset($_no_bottom_link)) 
+				if (!isset($_no_bottom_link))
 					echo "<a href=\"#\" class=\"bottom_link\">".$lang['strgotoppage']."</a>";
 
 				echo "</body>\n";
@@ -620,19 +639,18 @@
 		/**
 		 * Display a link
 		 * @param $link An associative array of link parameters to print
-		 *     link = array(
-		 *       'attr' => array( // list of A tag attribute
-		 *          'attrname' => attribute value
-		 *          ...
-		 *       ),
-		 *       'content' => The link text
-		 *       'fields' => (optional) the data from which content and attr's values are obtained
-		 *     );
-		 *   the special attribute 'href' might be a string or an array. If href is an array it
-		 *   will be generated by getActionUrl. See getActionUrl comment for array format.
+		 * 	link = array(
+		 * 		'attr' => array( // list of A tag attribute
+		 * 			'attrname' => attribute value
+		 * 			...
+		 * 		),
+		 *		'content' => The link text
+		 * 		'fields' => (optional) the data from which content and attr's values are obtained
+		 * 	);
+		 * the special attribute 'href' might be a string or an array. If href is an array it
+		 * will be generated by getActionUrl. See getActionUrl comment for array format.
 		 */
 		function printLink($link) {
-
 			if (! isset($link['fields']))
 				$link['fields'] = $_REQUEST;
 
@@ -682,7 +700,7 @@
 			echo "<table class=\"tabs\"><tr>\n";
 			#echo "<div class=\"tabs\">\n";
 
-			if (count($tabs) > 0) 
+			if (count($tabs) > 0)
 				$width = (int)(100 / count($tabs)).'%';
 			else
 				$width = 1;
@@ -691,7 +709,6 @@
 				$active = ($tab_id == $activetab) ? ' active' : '';
 
 				if (!isset($tab['hide']) || $tab['hide'] !== true) {
-
 					$tablink = '<a href="' . htmlentities($this->getActionUrl($tab, $_REQUEST)) . '">';
 
 					if (isset($tab['icon']) && $icon = $this->icon($tab['icon']))
@@ -1268,37 +1285,37 @@
 					);
 					break;
 
-                case 'fulltext':
-                    $tabs = array (
-                        'ftsconfigs' => array (
-                            'title' => $lang['strftstabconfigs'],
-                            'url'   => 'fulltext.php',
-                            'urlvars' => array('subject' => 'schema'),
-                            'hide'  => !$data->hasFTS(),
-                            'help'  => 'pg.ftscfg',
-                            'tree'  => true,
-                            'icon'  => 'FtsCfg',
-                        ),
-                        'ftsdicts' => array (
-                            'title' => $lang['strftstabdicts'],
-                            'url'   => 'fulltext.php',
-                            'urlvars' => array('subject' => 'schema', 'action' => 'viewdicts'),
-                            'hide'  => !$data->hasFTS(),
-                            'help'  => 'pg.ftsdict',
-                            'tree'  => true,
-                            'icon'  => 'FtsDict',
-                        ),
-                        'ftsparsers' => array (
-                            'title' => $lang['strftstabparsers'],
-                            'url'   => 'fulltext.php',
-                            'urlvars' => array('subject' => 'schema', 'action' => 'viewparsers'),
-                            'hide'  => !$data->hasFTS(),
-                            'help'  => 'pg.ftsparser',
-                            'tree'  => true,
-                            'icon'  => 'FtsParser',
-                        ),
-                    );
-                    break;
+				case 'fulltext':
+					$tabs = array (
+						'ftsconfigs' => array (
+							'title' => $lang['strftstabconfigs'],
+							'url'   => 'fulltext.php',
+							'urlvars' => array('subject' => 'schema'),
+							'hide'  => !$data->hasFTS(),
+							'help'  => 'pg.ftscfg',
+							'tree'  => true,
+							'icon'  => 'FtsCfg',
+						),
+						'ftsdicts' => array (
+							'title' => $lang['strftstabdicts'],
+							'url'   => 'fulltext.php',
+							'urlvars' => array('subject' => 'schema', 'action' => 'viewdicts'),
+							'hide'  => !$data->hasFTS(),
+							'help'  => 'pg.ftsdict',
+							'tree'  => true,
+							'icon'  => 'FtsDict',
+						),
+						'ftsparsers' => array (
+							'title' => $lang['strftstabparsers'],
+							'url'   => 'fulltext.php',
+							'urlvars' => array('subject' => 'schema', 'action' => 'viewparsers'),
+							'hide'  => !$data->hasFTS(),
+							'help'  => 'pg.ftsparser',
+							'tree'  => true,
+							'icon'  => 'FtsParser',
+						),
+					);
+					break;
 			}
 
 			// Tabs hook's place
@@ -1332,6 +1349,10 @@
 
 			$server_info = $this->getServerInfo();
 			$reqvars = $this->getRequestVars('table');
+
+			if (!$conf['extra_session_security']) {
+				echo '<div class="alert-banner"><p><a href="http://phppgadmin.sourceforge.net/doku.php?id=faq#other_questions" target="_blank" rel="noopener noreferrer">', htmlspecialchars($lang['sessionsecuritywarning']), '</a></p></div>';
+			}
 
 			echo "<div class=\"topbar\"><table style=\"width: 100%\"><tr><td>";
 
@@ -1844,7 +1865,7 @@
 				$subject = value($urlvars['subject'], $fields);
 			else
 				$subject = '';
-			
+
 			if (isset($_REQUEST['server']) and !isset($urlvars['server']) and $subject != 'root') {
 				$urlvars['server'] = $_REQUEST['server'];
 				if (isset($_REQUEST['database']) and !isset($urlvars['database']) and $subject != 'server') {
@@ -1945,7 +1966,6 @@
 			unset($actions['multiactions']);
 
 			if ($tabledata->recordCount() > 0) {
-
 				// Remove the 'comment' column if they have been disabled
 				if (!$conf['show_comments']) {
 					unset($columns['comment']);
@@ -1968,12 +1988,12 @@
 				echo "<table>\n";
 				echo "<tr>\n";
 
-                // Handle cases where no class has been passed 
-                if (isset($column['class'])) {
-			        $class = $column['class'] !== '' ? " class=\"{$column['class']}\"":'';
-                } else {
-                    $class = '';
-                }
+				// Handle cases where no class has been passed
+				if (isset($column['class'])) {
+					$class = $column['class'] !== '' ? " class=\"{$column['class']}\"":'';
+				} else {
+					$class = '';
+				}
 
 				// Display column headings
 				if ($has_ma) echo "<th></th>";
@@ -2013,7 +2033,6 @@
 					}
 
 					foreach ($columns as $column_id => $column) {
-
 						// Apply default values for missing parameters
 						if (isset($column['url']) && !isset($column['vars'])) $column['vars'] = array();
 
@@ -2166,7 +2185,6 @@
 
 			if (count($treedata) > 0) {
 				foreach($treedata as $rec) {
-
 					echo "<tree";
 					echo value_xml_attr('text', $attrs['text'], $rec);
 					echo value_xml_attr('action', $attrs['action'], $rec);
@@ -2326,7 +2344,7 @@
 
 			return $grps;
 		}
-		
+
 
 		/**
 		 * Get list of servers
@@ -2346,15 +2364,15 @@
 						$conf['srv_groups'][$group]['servers'])), 1);
 				else
 					$group = '';
-			
+
 			foreach($conf['servers'] as $idx => $info) {
 				$server_id = $info['host'].':'.$info['port'].':'.$info['sslmode'];
-				if (($group === false) 
+				if (($group === false)
 					or (isset($group[$idx]))
 					or ($group === 'all')
 				) {
 					$server_id = $info['host'].':'.$info['port'].':'.$info['sslmode'];
-					
+
 					if (isset($logins[$server_id])) $srvs[$server_id] = $logins[$server_id];
 					else $srvs[$server_id] = $info;
 
@@ -2437,10 +2455,10 @@
 
 		/**
 		 * Set server information.
-		 * @param $key parameter name to set, or null to replace all
+		 * @param $key string parameter name to set, or null to replace all
 		 *             params with the assoc-array in $value.
-		 * @param $value the new value, or null to unset the parameter
-		 * @param $server_id the server identifier, or null for current
+		 * @param $value string the new value, or null to unset the parameter
+		 * @param $server_id string the server identifier, or null for current
 		 *                   server.
 		 */
 		function setServerInfo($key, $value, $server_id = null)
@@ -2460,7 +2478,7 @@
 					$_SESSION['webdbLogin'][$server_id][$key] = $value;
 			}
 		}
-		
+
 		/**
 		 * Set the current schema
 		 * @param $schema The schema name
@@ -2469,7 +2487,7 @@
 		 */
 		function setCurrentSchema($schema) {
 			global $data;
-			
+
 			$status = $data->setSchema($schema);
 			if($status != 0)
 				return $status;
@@ -2480,7 +2498,7 @@
 		}
 
 		/**
-		 * Save the given SQL script in the history 
+		 * Save the given SQL script in the history
 		 * of the database and server.
 		 * @param $script the SQL script to save.
 		 */
@@ -2493,12 +2511,12 @@
 				'queryid' => $time,
 			);
 		}
-	
+
 		/*
-		 * Output dropdown list to select server and 
+		 * Output dropdown list to select server and
 		 * databases form the popups windows.
 		 * @param $onchange Javascript action to take when selections change.
-		 */	
+		 */
 		function printConnection($onchange) {
 			global $data, $lang, $misc;
 
@@ -2507,7 +2525,7 @@
 			$misc->printHelp($lang['strserver'], 'pg.server');
 			echo "</label>";
 			echo ": <select name=\"server\" {$onchange}>\n";
-			
+
 			$servers = $misc->getServers();
 			foreach($servers as $info) {
 				if (empty($info['username'])) continue; // not logged on this server
@@ -2516,20 +2534,19 @@
 					htmlspecialchars("{$info['desc']} ({$info['id']})"), "</option>\n";
 			}
 			echo "</select>\n</td><td style=\"text-align: right\">\n";
-			
+
 			// Get the list of all databases
 			$databases = $data->getDatabases();
 
 			if ($databases->recordCount() > 0) {
-
 				echo "<label>";
 				$misc->printHelp($lang['strdatabase'], 'pg.database');
 				echo ": <select name=\"database\" {$onchange}>\n";
-				
+
 				//if no database was selected, user should select one
 				if (!isset($_REQUEST['database']))
 					echo "<option value=\"\">--</option>\n";
-				
+
 				while (!$databases->EOF) {
 					$dbname = $databases->fields['datname'];
 					echo "<option value=\"", htmlspecialchars($dbname), "\"",
@@ -2541,10 +2558,10 @@
 			}
 			else {
 				$server_info = $misc->getServerInfo();
-				echo "<input type=\"hidden\" name=\"database\" value=\"", 
+				echo "<input type=\"hidden\" name=\"database\" value=\"",
 					htmlspecialchars($server_info['defaultdb']), "\" />\n";
 			}
-			
+
 			echo "</td></tr></table>\n";
 		}
 
