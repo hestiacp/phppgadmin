@@ -9,12 +9,11 @@ body {
 	margin:	4px;
 	font-family: arial, tahoma, verdana, helvetica, sans-serif, serif;
 	padding: 0px;
-	font-size: smaller; /*0.8em;*/
 }
 body.browser {
 	background-color: #efefef;
 	font-family: arial, tahoma, verdana, helvetica, sans-serif, serif;
-	font-size: smaller; /*1em;*/
+	font-size: medium;
 	border-right: 1px dashed #c0c0c0;
 }
 body.bottombar {
@@ -93,7 +92,7 @@ ul.toplink li:first-child, ul.navlink li:first-child {
 tr.data1, tr.data2, tr.data3 {
 	color: #000000;
 	font-family: arial, tahoma, verdana, helvetica, sans-serif, serif;
-	font-size: smaller; /*0.8em;*/
+	font-size: medium; /*0.8em;*/
 }
 tr.data1:hover, tr.data2:hover, tr.data3:hover {
 	background-color: #DDD;
