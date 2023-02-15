@@ -59,7 +59,7 @@ $reporter = new HtmlCoverageReporter("phpPgAdmin Code coverage report","","$PHPC
 
 // Sets the directories or file paths to be included in the code coverage recording.
 $includePaths = array(realpath($PHPCOVERAGE_APPBASE_PATH));
-$excludePaths = array(realpath($PHPCOVERAGE_APPBASE_PATH)."/lang", realpath($PHPCOVERAGE_APPBASE_PATH)."/libraries/adodb/drivers");
+$excludePaths = array(realpath($PHPCOVERAGE_APPBASE_PATH)."/lang", realpath($PHPCOVERAGE_APPBASE_PATH)."/vendor/adodb/adodb-php/drivers");
 $cov = new RemoteCoverageRecorder($includePaths, $excludePaths, $reporter);
     
 // Generate the code coverage report
