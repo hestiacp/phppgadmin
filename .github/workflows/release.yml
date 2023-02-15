@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Validate composer.json and composer.lock
+      run: composer validate --strict
+
+    - name: Cache composer packages
+      id: composer-cache
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-
+
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress
+
+    - name: Create temporary artifact folder
+      run: mkdir artifacts
+
+    - name: Create release artifacts
+      run: tar -czvf artifacts/phppgadmin-${{ github.ref_name }}.tar.gz classes conf help images js lang libraries plugins themes vendor xloadtree LICENSE *.php *.js robots.txt
+
+    - name: Upload artifacts for workflow
+      uses: actions/upload-artifact@v3
+      with: 
+          name: artifacts
+          path: artifacts
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+          files: artifacts/phppgadmin-${{ github.ref_name }}.tar.gz
