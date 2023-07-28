@@ -7,7 +7,7 @@
         "php": ">=7.4",
 		"ext-pgsql": "*",
         "ext-mbstring": "*",
-        "adodb/adodb-php": "^5.22"
+        "adodb/adodb-php": "^5.22.6"
     },
     "minimum-stability": "stable",
     "autoload": {
