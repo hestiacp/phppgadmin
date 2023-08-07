@@ -44,7 +44,7 @@
 				echo "\t\t<td class=\"data\"><input name=\"name\" size=\"32\" maxlength=\"{$data->_maxNameLen}\" value=\"",
 					htmlspecialchars($_REQUEST['name']), "\" /></td>\n\t</tr>\n";
 				echo "\t<tr>\n\t\t<th class=\"data left required\">{$lang['strnumcols']}</th>\n";
-				echo "\t\t<td class=\"data\"><input name=\"fields\" size=\"5\" maxlength=\"{$data->_maxNameLen}\" value=\"",
+				echo "\t\t<td class=\"data\"><input type=\"number\" name=\"fields\" size=\"5\" maxlength=\"{$data->_maxNameLen}\" value=\"",
 					htmlspecialchars($_REQUEST['fields']), "\" /></td>\n\t</tr>\n";
 				if ($data->hasServerOids()) {
 					echo "\t<tr>\n\t\t<th class=\"data left\">{$lang['stroptions']}</th>\n";
