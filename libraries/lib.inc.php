@@ -16,7 +16,7 @@
 	$appName = 'phpPgAdmin';
 
 	// Application version
-	$appVersion = '7.14.5-hestiacp';
+	$appVersion = '7.14.6-hestiacp';
 
 	// PostgreSQL and PHP minimum version
 	global $postgresqlMinVer;
@@ -54,9 +54,9 @@
 	// Session start: if extra_session_security is on, make sure cookie_samesite
 	// is on (exit if we fail); otherwise, just start the session
 	$our_session_name = 'PPA_ID';
-	if ($conf['extra_session_security']) {
+	if (($conf['extra_session_security'] ?? true) === true) {
 		if (version_compare(phpversion(), '7.3', '<')) {
-			exit('PHPPgAdmin cannot be fully secured while running under PHP versions before 7.3.  Please upgrade PHP if possible.  If you cannot upgrade, and you\'re willing to assume the risk of CSRF attacks, you can change the value of "extra_session_security" to false in your config.inc.php file.');
+			exit('phpPgAdmin cannot be fully secured while running under PHP versions before 7.3. Please upgrade PHP if possible. If you cannot upgrade, and you\'re willing to assume the risk of CSRF attacks, you can change the value of "extra_session_security" to false in your config.inc.php file.');
 		}
 
 		if (ini_get('session.auto_start')) {
@@ -286,3 +286,93 @@
 	}
 
 	$plugin_manager = new PluginManager($_language);
+
+	/**
+	 * Safe unserializer wrapper
+	 *
+	 * It does not unserialize data containing objects
+	 *
+	 * Function from phpMyAdmin version 5.2.1
+	 *
+	 * @param string $data Data to unserialize
+	 *
+	 * @return mixed|null
+	 */
+	function safeUnserialize(string $data) {
+		/* validate serialized data */
+		$length = strlen($data);
+		$depth = 0;
+		for ($i = 0; $i < $length; $i++) {
+			$value = $data[$i];
+
+			switch ($value) {
+				case '}':
+					/* end of array */
+					if ($depth <= 0) {
+						return null;
+					}
+
+					$depth--;
+					break;
+				case 's':
+					/* string */
+					// parse sting length
+					$strlen = intval(substr($data, $i + 2));
+					// string start
+					$i = strpos($data, ':', $i + 2);
+					if ($i === false) {
+						return null;
+					}
+
+					// skip string, quotes and ;
+					$i += 2 + $strlen + 1;
+					if ($data[$i] !== ';') {
+						return null;
+					}
+
+					break;
+
+				case 'b':
+				case 'i':
+				case 'd':
+					/* bool, integer or double */
+					// skip value to separator
+					$i = strpos($data, ';', $i);
+					if ($i === false) {
+						return null;
+					}
+
+					break;
+				case 'a':
+					/* array */
+					// find array start
+					$i = strpos($data, '{', $i);
+					if ($i === false) {
+						return null;
+					}
+
+					// remember nesting
+					$depth++;
+					break;
+				case 'N':
+					/* null */
+					// skip to end
+					$i = strpos($data, ';', $i);
+					if ($i === false) {
+						return null;
+					}
+
+					break;
+				default:
+					/* any other elements are not wanted */
+					return null;
+			}
+		}
+
+		// check unterminated arrays
+		if ($depth > 0) {
+			return null;
+		}
+
+		return unserialize($data);
+	}

@@ -88,7 +88,7 @@
 				'content' => $lang['strftscreateconfig']
 			)
 		);
-			
+
 		$misc->printNavLinks($navlinks, 'fulltext-fulltext', get_defined_vars());
 	}
 
@@ -222,7 +222,7 @@
 			$data->fieldClean($ftsparsers->fields['schema']);
 			$data->fieldClean($ftsparsers->fields['name']);
 			$parsername = $ftsparsers->fields['schema'] .'.'. $ftsparsers->fields['name'];
-			
+
 			$ftsparsers_[$parsername] = serialize(array(
 				'parser' => $ftsparsers->fields['name'],
 				'schema' => $ftsparsers->fields['schema']
@@ -259,14 +259,14 @@
 
 		$err = '';
 		// Check that they've given a name
-		if ($_POST['formName'] == '') $err .= "{$lang['strftsconfigneedsname']}<br />";		
+		if ($_POST['formName'] == '') $err .= "{$lang['strftsconfigneedsname']}<br />";
 		if (($_POST['formParser'] != '') && ($_POST['formTemplate'] != ''))  $err .= "{$lang['strftscantparsercopy']}<br />";
 
 		if ($err != '') return doCreateConfig($err);
 
-		if ($_POST['formParser'] != '') $formParser = unserialize($_POST['formParser']);
+		if ($_POST['formParser'] != '') $formParser = safeUnserialize($_POST['formParser']);
 		else $formParser = '';
-		if ($_POST['formTemplate'] != '') $formTemplate = unserialize($_POST['formTemplate']);
+		if ($_POST['formTemplate'] != '') $formTemplate = safeUnserialize($_POST['formTemplate']);
 		else $formTemplate = '';
 
 		$status = $data->createFtsConfiguration($_POST['formName'], $formParser, $formTemplate, $_POST['formComment']);
@@ -640,7 +640,7 @@
 		echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" />\n";
 		echo "</p>\n";
 		echo "</form>\n",
-			"<script type=\"text/javascript\">				
+			"<script type=\"text/javascript\">
 				function templateOpts() {
 					isTpl = document.getElementsByName('formIsTemplate')[0].checked;
 					document.getElementsByName('formTemplate')[0].disabled = isTpl;
@@ -648,7 +648,7 @@
 					document.getElementsByName('formLexize')[0].disabled = !isTpl;
 					document.getElementsByName('formInit')[0].disabled = !isTpl;
 				}
-				
+
 				document.getElementsByName('formIsTemplate')[0].onchange = templateOpts;
 
 				templateOpts();
@@ -667,18 +667,18 @@
 
 			if(!isset($_POST['formIsTemplate'])) $_POST['formIsTemplate'] = false;
 			if(isset($_POST['formTemplate']))
-				$formTemplate = unserialize($_POST['formTemplate']);
+				$formTemplate = safeUnserialize($_POST['formTemplate']);
 			else
 				$formTemplate = '';
 			if(!isset($_POST['formLexize'])) $_POST['formLexize'] = '';
 			if(!isset($_POST['formInit'])) $_POST['formInit'] = '';
 			if(!isset($_POST['formOption'])) $_POST['formOption'] = '';
-			
+
 			$status = $data->createFtsDictionary($_POST['formName'], $_POST['formIsTemplate'],
 				$formTemplate, $_POST['formLexize'],
 				$_POST['formInit'], $_POST['formOption'], $_POST['formComment']
 			);
-			
+
 			if ($status == 0) {
 				$_reload_browser = true;
 				doViewDicts($lang['strftsdictcreated']);
@@ -773,7 +773,7 @@
 			if (isset($_REQUEST['ma'])) {
 
 				foreach($_REQUEST['ma'] as $v) {
-					$a = unserialize(htmlspecialchars_decode($v, ENT_QUOTES));
+					$a = safeUnserialize(htmlspecialchars_decode($v, ENT_QUOTES));
 					echo "<p>", sprintf($lang['strconfdropftsmapping'], $misc->printVal($a['mapping']), $misc->printVal($_REQUEST['ftscfg'])), "</p>\n";
 					printf('<input type="hidden" name="mapping[]" value="%s" />', htmlspecialchars($a['mapping']));
 				}
@@ -785,7 +785,7 @@
 
 			echo "<input type=\"hidden\" name=\"ftscfg\" value=\"{$_REQUEST['ftscfg']}\" />\n";
 			echo "<input type=\"hidden\" name=\"action\" value=\"dropmapping\" />\n";
-            echo "<input type=\"hidden\" name=\"prev_action\" value=\"viewconfig\" /></p>\n";            
+			echo "<input type=\"hidden\" name=\"prev_action\" value=\"viewconfig\" /></p>\n";
 			echo $misc->form;
 			echo "<input type=\"submit\" name=\"drop\" value=\"{$lang['strdrop']}\" />\n";
 			echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" />\n";
@@ -835,7 +835,7 @@
 				$ma_mappings = array();
 				$ma_mappings_names = array();
 				foreach($_REQUEST['ma'] as $v) {
-					$a = unserialize(htmlspecialchars_decode($v, ENT_QUOTES));
+					$a = safeUnserialize(htmlspecialchars_decode($v, ENT_QUOTES));
 					printf('<input type="hidden" name="formMapping[]" value="%s" />', htmlspecialchars($a['mapping']));
 					$ma_mappings[] = $data->getFtsMappingByName($_POST['ftscfg'], $a['mapping']);
 					$ma_mappings_names[] = $a['mapping'];
@@ -869,8 +869,8 @@
 			echo "</table>\n";
 			echo "<p><input type=\"hidden\" name=\"action\" value=\"altermapping\" />\n";
 			echo "<input type=\"hidden\" name=\"ftscfg\" value=\"", htmlspecialchars($_POST['ftscfg']), "\" />\n";
-            echo "<input type=\"hidden\" name=\"prev_action\" value=\"viewconfig\" /></p>\n";
-            
+			echo "<input type=\"hidden\" name=\"prev_action\" value=\"viewconfig\" /></p>\n";
+
 			echo $misc->form;
 			echo "<input type=\"submit\" name=\"alter\" value=\"{$lang['stralter']}\" />\n";
 			echo "<input type=\"submit\" name=\"cancel\" value=\"{$lang['strcancel']}\" /></p>\n";
@@ -1116,5 +1116,3 @@
 	}
 
 	$misc->printFooter();
-
-?>
